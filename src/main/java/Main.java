@@ -1,9 +1,5 @@
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URISyntaxException;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
@@ -13,16 +9,15 @@ public class Main {
   static void main(String... args) throws IOException, URISyntaxException {
     IO.println("Hello World!");
 
-    // Einlesen über Konsole/Prompt
-    String input = IO.readln("expr?> ");
+    Path path = Path.of("src/main/resources/cpp/tests/pos/GOLD01_basics.cpp");
 
-    HelloLexer lexer = new HelloLexer(CharStreams.fromString(input));
-    CommonTokenStream tokens = new CommonTokenStream(lexer);
-    HelloParser parser = new HelloParser(tokens);
+    cppLexer cpplexer = new cppLexer(CharStreams.fromPath(path));
+    CommonTokenStream tokens = new CommonTokenStream(cpplexer);
+    cppParser parser = new cppParser(tokens);
 
-    ParseTree tree = parser.start(); // Start-Regel
+    ParseTree tree = parser.program(); // Start-Regel
     IO.println(tree.toStringTree(parser));
-
+    /*
     // Einlesen über den Classpath
     IO.readln("next?> ");
     try (InputStream in = Main.class.getResourceAsStream("/cpp/vars.cpp")) {
@@ -37,5 +32,6 @@ public class Main {
     String txt = Files.readString(Path.of(url.toURI()), StandardCharsets.UTF_8);
     IO.println("\n\n/cpp/expr.cpp");
     IO.println(txt);
+    */
   }
 }
