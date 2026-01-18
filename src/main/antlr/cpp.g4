@@ -1,6 +1,6 @@
 grammar cpp;
 
-<<<<<<< HEAD
+
 //Parser
 program
     : topLevelDecl* EOF
@@ -201,7 +201,7 @@ BLOCK_COMMENT
 PREPROCESSOR
     : '#' ~[\r\n]* -> skip
     ;
-=======
+
 programm : stmt* EOF ;
 
 //Alles wie funktions decleration, variabelen, main, fucktionscalls, while if return
@@ -278,9 +278,3 @@ ASSIGN_OP : '=' | '*=' | '+=' | '-=';
 MULTI_LINE_COMMENT :  '/*' .*? ('*/' | EOF ) -> skip;
 COMMENT: '//' ( ~('\r'|'\n')* ) '\r'? '\n' -> skip ;
 INCLUDE: '#include ' ( ~('\r'|'\n')* ) '\r'? '\n' -> skip ;
-
-
-
-
-
->>>>>>> origin/HEAD
