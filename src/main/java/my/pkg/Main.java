@@ -6,10 +6,16 @@ import org.antlr.v4.runtime.tree.ParseTree;
 
 public class Main {
   static void main(String... args) {
-    IO.println("Hello World!");
+    System.out.println("Hello World!");
 
     // Einlesen über Konsole/Prompt
-    String input = IO.readln("expr?> ");
+    System.out.print("expr?> ");
+    String input;
+    try {
+      input = new java.io.BufferedReader(new java.io.InputStreamReader(System.in)).readLine();
+    } catch (java.io.IOException e) {
+      throw new RuntimeException(e);
+    }
 
     // Demonstriert den Einsatz von Packages und Grammatiken
     HelloPackageLexer lexer = new HelloPackageLexer(CharStreams.fromString(input));
@@ -17,6 +23,6 @@ public class Main {
     HelloPackageParser parser = new HelloPackageParser(tokens);
 
     ParseTree tree = parser.start(); // Start-Regel
-    IO.println(tree.toStringTree(parser));
+    System.out.println(tree.toStringTree(parser));
   }
 }

@@ -5,6 +5,10 @@ program
     : topLevelDecl* EOF
     ;
 
+replInput
+    : (topLevelDecl | stmt | expr) EOF
+    ;
+
 topLevelDecl
     : functionDef
     | classDef
@@ -45,7 +49,7 @@ param
 classDef
     : 'class' ID (':' 'public' ID)? '{'
         'public:' classMember*
-      '}'
+      '}' ';'?
     ;
 
 classMember
