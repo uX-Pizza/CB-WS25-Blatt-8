@@ -18,12 +18,10 @@ import cpp.runtime.Instance;
 import cpp.runtime.ReturnSignal;
 import cpp.runtime.Value;
 import cpp.runtime.VarSlot;
-import cpp.sema.DefinitionBuilder;
 import cpp.sema.SignatureUtil;
 import cpp.sema.TypeResolver;
 import cpp.util.IO;
 import cpp.util.ParserErrorListener;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -96,7 +94,8 @@ public class Interpreter {
   private void processReplInput(String input) {
     try {
       cppLexer lexer = new cppLexer(org.antlr.v4.runtime.CharStreams.fromString(input));
-      org.antlr.v4.runtime.CommonTokenStream tokens = new org.antlr.v4.runtime.CommonTokenStream(lexer);
+      org.antlr.v4.runtime.CommonTokenStream tokens =
+          new org.antlr.v4.runtime.CommonTokenStream(lexer);
       cppParser parser = new cppParser(tokens);
       parser.removeErrorListeners();
       parser.addErrorListener(new ParserErrorListener());
@@ -161,8 +160,7 @@ public class Interpreter {
     addBuiltin("print_bool", Type.voidType(), List.of(new ParamDef(Type.boolType(false), "v")));
     addBuiltin("print_int", Type.voidType(), List.of(new ParamDef(Type.intType(false), "v")));
     addBuiltin("print_char", Type.voidType(), List.of(new ParamDef(Type.charType(false), "v")));
-    addBuiltin(
-        "print_string", Type.voidType(), List.of(new ParamDef(Type.stringType(false), "v")));
+    addBuiltin("print_string", Type.voidType(), List.of(new ParamDef(Type.stringType(false), "v")));
   }
 
   private void addBuiltin(String name, Type returnType, List<ParamDef> params) {
@@ -279,8 +277,7 @@ public class Interpreter {
     }
     String name = ctx.ID().getText();
     List<ParamDef> params = parseParams(ctx.paramList());
-    MethodDef def =
-        new MethodDef(name, returnType, params, ctx.block(), isVirtual, classDef.name);
+    MethodDef def = new MethodDef(name, returnType, params, ctx.block(), isVirtual, classDef.name);
     String signature = SignatureUtil.signature(name, params);
     for (MethodDef existing : classDef.methods) {
       if (SignatureUtil.signature(existing.name, existing.params).equals(signature)) {
@@ -473,7 +470,13 @@ public class Interpreter {
       if (right.type.kind != Type.Kind.BOOL) {
         throw new CompileError("|| requires bool operands");
       }
-      left = new EvalResult(Value.boolValue((boolean) right.value.data), Type.boolType(false), false, null, false);
+      left =
+          new EvalResult(
+              Value.boolValue((boolean) right.value.data),
+              Type.boolType(false),
+              false,
+              null,
+              false);
     }
     return left;
   }
@@ -492,7 +495,13 @@ public class Interpreter {
       if (right.type.kind != Type.Kind.BOOL) {
         throw new CompileError("&& requires bool operands");
       }
-      left = new EvalResult(Value.boolValue((boolean) right.value.data), Type.boolType(false), false, null, false);
+      left =
+          new EvalResult(
+              Value.boolValue((boolean) right.value.data),
+              Type.boolType(false),
+              false,
+              null,
+              false);
     }
     return left;
   }
@@ -538,23 +547,25 @@ public class Interpreter {
       if (left.type.kind == Type.Kind.INT) {
         int l = (int) left.value.data;
         int r = (int) right.value.data;
-        result = switch (op) {
-          case "<" -> l < r;
-          case "<=" -> l <= r;
-          case ">" -> l > r;
-          case ">=" -> l >= r;
-          default -> throw new CompileError("Unknown operator: " + op);
-        };
+        result =
+            switch (op) {
+              case "<" -> l < r;
+              case "<=" -> l <= r;
+              case ">" -> l > r;
+              case ">=" -> l >= r;
+              default -> throw new CompileError("Unknown operator: " + op);
+            };
       } else if (left.type.kind == Type.Kind.CHAR) {
         char l = (char) left.value.data;
         char r = (char) right.value.data;
-        result = switch (op) {
-          case "<" -> l < r;
-          case "<=" -> l <= r;
-          case ">" -> l > r;
-          case ">=" -> l >= r;
-          default -> throw new CompileError("Unknown operator: " + op);
-        };
+        result =
+            switch (op) {
+              case "<" -> l < r;
+              case "<=" -> l <= r;
+              case ">" -> l > r;
+              case ">=" -> l >= r;
+              default -> throw new CompileError("Unknown operator: " + op);
+            };
       } else {
         throw new CompileError("Relational operators require int or char");
       }
@@ -621,7 +632,8 @@ public class Interpreter {
         if (value.type.kind != Type.Kind.BOOL) {
           throw new CompileError("! requires bool operand");
         }
-        return new EvalResult(Value.boolValue(!(boolean) value.value.data), Type.boolType(false), false, null, false);
+        return new EvalResult(
+            Value.boolValue(!(boolean) value.value.data), Type.boolType(false), false, null, false);
       }
       if (value.type.kind != Type.Kind.INT) {
         throw new CompileError("Unary +/- requires int operand");
@@ -645,7 +657,8 @@ public class Interpreter {
       i += 2;
       if (i < ctx.getChildCount() && "(".equals(ctx.getChild(i).getText())) {
         cppParser.ArgListContext argCtx = null;
-        if (i + 1 < ctx.getChildCount() && ctx.getChild(i + 1) instanceof cppParser.ArgListContext) {
+        if (i + 1 < ctx.getChildCount()
+            && ctx.getChild(i + 1) instanceof cppParser.ArgListContext) {
           argCtx = (cppParser.ArgListContext) ctx.getChild(i + 1);
           i++;
         }
@@ -798,7 +811,8 @@ public class Interpreter {
     return new EvalResult(Value.voidValue(), Type.voidType(), false, null, false);
   }
 
-  private EvalResult invokeMethod(EvalResult receiver, String name, List<ArgInfo> args, ExecContext context) {
+  private EvalResult invokeMethod(
+      EvalResult receiver, String name, List<ArgInfo> args, ExecContext context) {
     if (!receiver.type.isClass()) {
       throw new CompileError("Member access on non-class type");
     }
@@ -939,7 +953,8 @@ public class Interpreter {
     return true;
   }
 
-  private void bindParams(Env env, List<ParamDef> params, List<ArgInfo> args, ClassDef currentClass) {
+  private void bindParams(
+      Env env, List<ParamDef> params, List<ArgInfo> args, ClassDef currentClass) {
     for (int i = 0; i < params.size(); i++) {
       ParamDef param = params.get(i);
       ArgInfo arg = args.get(i);
@@ -1106,7 +1121,8 @@ public class Interpreter {
     Value value = right.value;
     if (targetType.isClass()) {
       if (!value.type.isClass()) {
-        throw new CompileError("Type mismatch: expected class " + targetType + " got " + value.type);
+        throw new CompileError(
+            "Type mismatch: expected class " + targetType + " got " + value.type);
       }
       if (!isDerivedFrom(value.type.className, targetType.className)) {
         throw new CompileError("Type mismatch: expected " + targetType + " got " + value.type);
@@ -1122,7 +1138,8 @@ public class Interpreter {
 
   private void expectType(Type expected, Type actual, String context) {
     if (!expected.equals(actual)) {
-      throw new CompileError("Type mismatch in " + context + ": expected " + expected + " got " + actual);
+      throw new CompileError(
+          "Type mismatch in " + context + ": expected " + expected + " got " + actual);
     }
   }
 

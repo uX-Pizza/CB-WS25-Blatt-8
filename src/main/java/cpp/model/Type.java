@@ -88,9 +88,7 @@ public class Type {
       return false;
     }
     Type other = (Type) obj;
-    return kind == other.kind
-        && Objects.equals(className, other.className)
-        && isRef == other.isRef;
+    return kind == other.kind && Objects.equals(className, other.className) && isRef == other.isRef;
   }
 
   @Override

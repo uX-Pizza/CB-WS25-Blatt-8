@@ -32,7 +32,7 @@ class CppTestSuite {
 
   @Test
   void sanity() {
-    assertNotNull(new Interpreter(new ProgramDef()));
+      new Interpreter(new ProgramDef());
   }
 
   @DisplayName("Positive tests")
@@ -72,7 +72,8 @@ class CppTestSuite {
     System.setOut(new PrintStream(buffer, true, StandardCharsets.UTF_8));
     try {
       cppLexer lexer = new cppLexer(org.antlr.v4.runtime.CharStreams.fromPath(file));
-      org.antlr.v4.runtime.CommonTokenStream tokens = new org.antlr.v4.runtime.CommonTokenStream(lexer);
+      org.antlr.v4.runtime.CommonTokenStream tokens =
+          new org.antlr.v4.runtime.CommonTokenStream(lexer);
       cppParser parser = new cppParser(tokens);
       parser.removeErrorListeners();
       parser.addErrorListener(new ParserErrorListener());

@@ -10,7 +10,6 @@ import cpp.model.MethodDef;
 import cpp.model.ParamDef;
 import cpp.model.ProgramDef;
 import cpp.model.Type;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -111,8 +110,7 @@ public class DefinitionBuilder {
     }
     String name = ctx.ID().getText();
     List<ParamDef> params = parseParams(ctx.paramList());
-    MethodDef def =
-        new MethodDef(name, returnType, params, ctx.block(), isVirtual, classDef.name);
+    MethodDef def = new MethodDef(name, returnType, params, ctx.block(), isVirtual, classDef.name);
     String signature = SignatureUtil.signature(name, params);
     for (MethodDef existing : classDef.methods) {
       if (SignatureUtil.signature(existing.name, existing.params).equals(signature)) {

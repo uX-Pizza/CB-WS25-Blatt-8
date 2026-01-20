@@ -1,7 +1,6 @@
 package cpp.runtime;
 
 import cpp.model.ClassDef;
-
 import java.util.LinkedHashMap;
 import java.util.Map;
 
