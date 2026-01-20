@@ -1,7 +1,7 @@
 grammar cpp;
 
 @header {
-package cpp;
+package cpp.antlr;
 }
 
 //Parser

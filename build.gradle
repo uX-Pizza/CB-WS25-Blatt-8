@@ -53,7 +53,7 @@ tasks.named('compileJava') {
 
 
 application {
-    mainClass = project.hasProperty('mainClass') ? project.property('mainClass') : 'cpp.Main'
+    mainClass = project.hasProperty('mainClass') ? project.property('mainClass') : 'cpp.app.Main'
 }
 
 
