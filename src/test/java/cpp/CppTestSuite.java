@@ -32,7 +32,7 @@ class CppTestSuite {
 
   @Test
   void sanity() {
-      new Interpreter(new ProgramDef());
+    new Interpreter(new ProgramDef());
   }
 
   @DisplayName("Positive tests")
