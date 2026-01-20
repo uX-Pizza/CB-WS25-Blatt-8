@@ -1,8 +1,16 @@
 grammar cpp;
 
+@header {
+package cpp.antlr;
+}
+
 //Parser
 program
     : topLevelDecl* EOF
+    ;
+
+replInput
+    : (topLevelDecl | stmt | expr) EOF
     ;
 
 topLevelDecl
@@ -45,7 +53,7 @@ param
 classDef
     : 'class' ID (':' 'public' ID)? '{'
         'public:' classMember*
-      '}'
+      '}' ';'?
     ;
 
 classMember

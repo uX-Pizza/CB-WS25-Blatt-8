@@ -53,8 +53,7 @@ tasks.named('compileJava') {
 
 
 application {
-    // TODO: Define your main class here
-    mainClass = 'Main'
+    mainClass = 'cpp.app.Main'
 }
 
 
