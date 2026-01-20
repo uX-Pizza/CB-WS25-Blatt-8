@@ -1,5 +1,9 @@
 grammar cpp;
 
+@header {
+package cpp;
+}
+
 //Parser
 program
     : topLevelDecl* EOF
