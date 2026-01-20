@@ -53,8 +53,7 @@ tasks.named('compileJava') {
 
 
 application {
-    // TODO: Define your main class here
-    mainClass = 'Main'
+    mainClass = project.hasProperty('mainClass') ? project.property('mainClass') : 'Main'
 }
 
 

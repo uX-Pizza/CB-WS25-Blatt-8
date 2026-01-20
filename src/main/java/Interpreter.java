@@ -947,6 +947,9 @@ public class Interpreter {
       } catch (ReturnSignal signal) {
         throw new CompileError("Return not allowed in constructor");
       }
+    } else if (ctor.isSyntheticCopy) {
+      Instance source = (Instance) args.get(0).result.value.data;
+      copyInto(instance, source, classDef.name);
     }
     return instance;
   }
@@ -976,12 +979,31 @@ public class Interpreter {
       }
     }
     if (matches.isEmpty()) {
+      ConstructorDef copyCtor = trySyntheticCopyCtor(classDef, args);
+      if (copyCtor != null) {
+        return copyCtor;
+      }
       throw new CompileError("No matching constructor for class: " + classDef.name);
     }
     if (matches.size() > 1) {
       throw new CompileError("Ambiguous constructor call for class: " + classDef.name);
     }
     return matches.get(0);
+  }
+
+  private ConstructorDef trySyntheticCopyCtor(ClassDef classDef, List<ArgInfo> args) {
+    if (args.size() != 1) {
+      return null;
+    }
+    ArgInfo arg = args.get(0);
+    if (!arg.result.type.isClass()) {
+      return null;
+    }
+    if (!arg.result.type.className.equals(classDef.name)) {
+      return null;
+    }
+    ParamDef param = new ParamDef(Type.classType(classDef.name, false), "other");
+    return new ConstructorDef(classDef.name, List.of(param), null, true);
   }
 
   private void initializeFields(Instance instance, ClassDef classDef) {
