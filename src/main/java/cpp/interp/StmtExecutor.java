@@ -147,7 +147,11 @@ public class StmtExecutor {
     throw new CompileError("Invalid condition type: " + result.type);
   }
 
-  public void bindParams(Env env, java.util.List<cpp.model.ParamDef> params, java.util.List<ArgInfo> args, ClassDef currentClass) {
+  public void bindParams(
+      Env env,
+      java.util.List<cpp.model.ParamDef> params,
+      java.util.List<ArgInfo> args,
+      ClassDef currentClass) {
     dispatch.bindParams(env, params, args, currentClass);
   }
 

@@ -35,8 +35,7 @@ public class ObjectModel {
       callBaseDefaultConstructor(instance, classDef.baseClass);
     }
     if (ctor.body != null) {
-      ExecContext ctorContext =
-          new ExecContext(new cpp.runtime.Env(null), instance, classDef);
+      ExecContext ctorContext = new ExecContext(new cpp.runtime.Env(null), instance, classDef);
       stmtExecutor.bindParams(ctorContext.env, ctor.params, args, classDef);
       try {
         stmtExecutor.executeBlock((cpp.antlr.cppParser.BlockContext) ctor.body, ctorContext, false);
@@ -88,7 +87,8 @@ public class ObjectModel {
     Value value = right.value;
     if (targetType.isClass()) {
       if (!value.type.isClass()) {
-        throw new CompileError("Type mismatch: expected class " + targetType + " got " + value.type);
+        throw new CompileError(
+            "Type mismatch: expected class " + targetType + " got " + value.type);
       }
       if (!isDerivedFrom(value.type.className, targetType.className)) {
         throw new CompileError("Type mismatch: expected " + targetType + " got " + value.type);
@@ -169,7 +169,8 @@ public class ObjectModel {
     }
     ExecContext ctorContext = new ExecContext(new cpp.runtime.Env(null), instance, baseClass);
     try {
-      stmtExecutor.executeBlock((cpp.antlr.cppParser.BlockContext) baseCtor.body, ctorContext, false);
+      stmtExecutor.executeBlock(
+          (cpp.antlr.cppParser.BlockContext) baseCtor.body, ctorContext, false);
     } catch (cpp.runtime.ReturnSignal signal) {
       throw new CompileError("Return not allowed in constructor");
     }
@@ -265,7 +266,8 @@ public class ObjectModel {
 
   public void expectType(Type expected, Type actual, String context) {
     if (!expected.equals(actual)) {
-      throw new CompileError("Type mismatch in " + context + ": expected " + expected + " got " + actual);
+      throw new CompileError(
+          "Type mismatch in " + context + ": expected " + expected + " got " + actual);
     }
   }
 }

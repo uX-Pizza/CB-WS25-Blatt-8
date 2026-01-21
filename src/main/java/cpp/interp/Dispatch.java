@@ -94,7 +94,8 @@ public class Dispatch {
     return false;
   }
 
-  public void bindParams(Env env, List<ParamDef> params, List<ArgInfo> args, ClassDef currentClass) {
+  public void bindParams(
+      Env env, List<ParamDef> params, List<ArgInfo> args, ClassDef currentClass) {
     for (int i = 0; i < params.size(); i++) {
       ParamDef param = params.get(i);
       ArgInfo arg = args.get(i);

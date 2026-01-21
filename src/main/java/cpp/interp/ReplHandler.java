@@ -59,7 +59,8 @@ public class ReplHandler {
   public void processInput(String input) {
     try {
       cppLexer lexer = new cppLexer(org.antlr.v4.runtime.CharStreams.fromString(input));
-      org.antlr.v4.runtime.CommonTokenStream tokens = new org.antlr.v4.runtime.CommonTokenStream(lexer);
+      org.antlr.v4.runtime.CommonTokenStream tokens =
+          new org.antlr.v4.runtime.CommonTokenStream(lexer);
       cppParser parser = new cppParser(tokens);
       parser.removeErrorListeners();
       parser.addErrorListener(new ParserErrorListener());
@@ -168,8 +169,7 @@ public class ReplHandler {
     }
     String name = ctx.ID().getText();
     List<ParamDef> params = parseParams(ctx.paramList());
-    MethodDef def =
-        new MethodDef(name, returnType, params, ctx.block(), isVirtual, classDef.name);
+    MethodDef def = new MethodDef(name, returnType, params, ctx.block(), isVirtual, classDef.name);
     String signature = SignatureUtil.signature(name, params);
     for (MethodDef existing : classDef.methods) {
       if (SignatureUtil.signature(existing.name, existing.params).equals(signature)) {

@@ -1,10 +1,8 @@
 package cpp.interp;
 
 import cpp.antlr.cppParser;
-import cpp.error.CompileError;
 import cpp.model.FunctionDef;
 import cpp.model.ProgramDef;
-import cpp.model.Type;
 import cpp.runtime.Env;
 import cpp.runtime.ReturnSignal;
 import cpp.sema.TypeResolver;
@@ -27,10 +25,10 @@ public class Interpreter {
     this.objectModel = new ObjectModel(program);
     this.dispatch = new Dispatch(program, objectModel);
     this.stmtExecutor = new StmtExecutor(typeResolver, dispatch, objectModel);
-    this.exprEvaluator =
-        new ExprEvaluator(program, typeResolver, dispatch, objectModel, builtins);
+    this.exprEvaluator = new ExprEvaluator(program, typeResolver, dispatch, objectModel, builtins);
     this.replHandler =
-        new ReplHandler(program, typeResolver, dispatch, objectModel, stmtExecutor, exprEvaluator, builtins);
+        new ReplHandler(
+            program, typeResolver, dispatch, objectModel, stmtExecutor, exprEvaluator, builtins);
 
     stmtExecutor.setExprEvaluator(exprEvaluator);
     exprEvaluator.setStmtExecutor(stmtExecutor);

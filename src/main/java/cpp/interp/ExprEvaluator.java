@@ -77,7 +77,11 @@ public class ExprEvaluator {
       }
       left =
           new EvalResult(
-              Value.boolValue((boolean) right.value.data), Type.boolType(false), false, null, false);
+              Value.boolValue((boolean) right.value.data),
+              Type.boolType(false),
+              false,
+              null,
+              false);
     }
     return left;
   }
@@ -98,7 +102,11 @@ public class ExprEvaluator {
       }
       left =
           new EvalResult(
-              Value.boolValue((boolean) right.value.data), Type.boolType(false), false, null, false);
+              Value.boolValue((boolean) right.value.data),
+              Type.boolType(false),
+              false,
+              null,
+              false);
     }
     return left;
   }
@@ -254,7 +262,8 @@ public class ExprEvaluator {
       i += 2;
       if (i < ctx.getChildCount() && "(".equals(ctx.getChild(i).getText())) {
         cppParser.ArgListContext argCtx = null;
-        if (i + 1 < ctx.getChildCount() && ctx.getChild(i + 1) instanceof cppParser.ArgListContext) {
+        if (i + 1 < ctx.getChildCount()
+            && ctx.getChild(i + 1) instanceof cppParser.ArgListContext) {
           argCtx = (cppParser.ArgListContext) ctx.getChild(i + 1);
           i++;
         }
@@ -424,7 +433,8 @@ public class ExprEvaluator {
       }
     }
     ExecContext methodContext =
-        new ExecContext(new cpp.runtime.Env(null), instance, program.classes.get(target.declaredIn));
+        new ExecContext(
+            new cpp.runtime.Env(null), instance, program.classes.get(target.declaredIn));
     stmtExecutor.bindParams(methodContext.env, target.params, args, methodContext.currentClass);
     try {
       stmtExecutor.executeBlock((cppParser.BlockContext) target.body, methodContext, false);

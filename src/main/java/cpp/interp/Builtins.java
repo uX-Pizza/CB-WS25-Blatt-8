@@ -11,9 +11,12 @@ import java.util.List;
 
 public class Builtins {
   public void register(ProgramDef program) {
-    addBuiltin(program, "print_bool", Type.voidType(), List.of(new ParamDef(Type.boolType(false), "v")));
-    addBuiltin(program, "print_int", Type.voidType(), List.of(new ParamDef(Type.intType(false), "v")));
-    addBuiltin(program, "print_char", Type.voidType(), List.of(new ParamDef(Type.charType(false), "v")));
+    addBuiltin(
+        program, "print_bool", Type.voidType(), List.of(new ParamDef(Type.boolType(false), "v")));
+    addBuiltin(
+        program, "print_int", Type.voidType(), List.of(new ParamDef(Type.intType(false), "v")));
+    addBuiltin(
+        program, "print_char", Type.voidType(), List.of(new ParamDef(Type.charType(false), "v")));
     addBuiltin(
         program,
         "print_string",
