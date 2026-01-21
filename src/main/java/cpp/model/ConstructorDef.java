@@ -1,20 +1,20 @@
 package cpp.model;
 
+import cpp.ast.BlockNode;
 import java.util.List;
-import org.antlr.v4.runtime.tree.ParseTree;
 
 public class ConstructorDef {
   public final String className;
   public final List<ParamDef> params;
-  public final ParseTree body;
+  public final BlockNode body;
   public final boolean isSyntheticCopy;
 
-  public ConstructorDef(String className, List<ParamDef> params, ParseTree body) {
+  public ConstructorDef(String className, List<ParamDef> params, BlockNode body) {
     this(className, params, body, false);
   }
 
   public ConstructorDef(
-      String className, List<ParamDef> params, ParseTree body, boolean isSyntheticCopy) {
+      String className, List<ParamDef> params, BlockNode body, boolean isSyntheticCopy) {
     this.className = className;
     this.params = params;
     this.body = body;

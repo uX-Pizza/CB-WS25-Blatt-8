@@ -2,6 +2,18 @@ package cpp.interp;
 
 import cpp.antlr.cppLexer;
 import cpp.antlr.cppParser;
+import cpp.ast.ASTNode;
+import cpp.ast.BlockNode;
+import cpp.ast.ClassDefNode;
+import cpp.ast.ClassMemberNode;
+import cpp.ast.ConstructorNode;
+import cpp.ast.ExprNode;
+import cpp.ast.ExprStmtNode;
+import cpp.ast.FieldDeclNode;
+import cpp.ast.FunctionNode;
+import cpp.ast.MethodNode;
+import cpp.ast.ParamNode;
+import cpp.ast.StmtNode;
 import cpp.error.CompileError;
 import cpp.error.RuntimeError;
 import cpp.model.ClassDef;
@@ -14,6 +26,7 @@ import cpp.model.ProgramDef;
 import cpp.model.Type;
 import cpp.runtime.Env;
 import cpp.runtime.EvalResult;
+import cpp.sema.ASTBuilder;
 import cpp.sema.SignatureUtil;
 import cpp.sema.TypeResolver;
 import cpp.util.IO;
@@ -65,27 +78,25 @@ public class ReplHandler {
       parser.removeErrorListeners();
       parser.addErrorListener(new ParserErrorListener());
       cppParser.ReplInputContext repl = parser.replInput();
-      if (repl.topLevelDecl() != null) {
-        cppParser.TopLevelDeclContext decl = repl.topLevelDecl();
-        if (decl.classDef() != null) {
-          registerReplClass(decl.classDef());
-        } else if (decl.functionDef() != null) {
-          registerReplFunction(decl.functionDef());
-        }
-      } else if (repl.stmt() != null) {
+      ASTBuilder astBuilder = new ASTBuilder();
+      ASTNode node = astBuilder.visit(repl);
+      if (node instanceof ClassDefNode classDefNode) {
+        registerReplClass(classDefNode);
+      } else if (node instanceof FunctionNode functionNode) {
+        registerReplFunction(functionNode);
+      } else if (node instanceof StmtNode stmt) {
         ExecContext context = new ExecContext(sessionEnv, null, null);
-        cppParser.StmtContext stmt = repl.stmt();
-        if (stmt.exprStmt() != null) {
-          EvalResult result = exprEvaluator.evalExpr(stmt.exprStmt().expr(), context);
+        if (stmt instanceof ExprStmtNode exprStmt) {
+          EvalResult result = exprEvaluator.evalExpr(exprStmt.expr, context);
           if (!result.type.isVoid()) {
             builtins.printValue(result.value);
           }
         } else {
           stmtExecutor.executeStmt(stmt, context);
         }
-      } else if (repl.expr() != null) {
+      } else if (node instanceof ExprNode expr) {
         ExecContext context = new ExecContext(sessionEnv, null, null);
-        EvalResult result = exprEvaluator.evalExpr(repl.expr(), context);
+        EvalResult result = exprEvaluator.evalExpr(expr, context);
         builtins.printValue(result.value);
       }
     } catch (CompileError | RuntimeError ex) {
@@ -93,17 +104,14 @@ public class ReplHandler {
     }
   }
 
-  private void registerReplClass(cppParser.ClassDefContext ctx) {
-    String name = ctx.ID(0).getText();
+  private void registerReplClass(ClassDefNode classDefNode) {
+    String name = classDefNode.name;
     if (program.classes.containsKey(name)) {
       throw new CompileError("Class already defined: " + name);
     }
-    String baseName = null;
-    if (ctx.ID().size() > 1) {
-      baseName = ctx.ID(1).getText();
-      if (!program.classes.containsKey(baseName)) {
-        throw new CompileError("Unknown base class: " + baseName);
-      }
+    String baseName = classDefNode.baseName;
+    if (baseName != null && !program.classes.containsKey(baseName)) {
+      throw new CompileError("Unknown base class: " + baseName);
     }
     ClassDef classDef = new ClassDef(name, baseName);
     if (baseName != null) {
@@ -111,13 +119,13 @@ public class ReplHandler {
     }
     program.classes.put(name, classDef);
 
-    for (cppParser.ClassMemberContext member : ctx.classMember()) {
-      if (member.fieldDecl() != null) {
-        addFieldRepl(classDef, member.fieldDecl());
-      } else if (member.methodDef() != null) {
-        addMethodRepl(classDef, member.methodDef());
-      } else if (member.constructorDef() != null) {
-        addConstructorRepl(classDef, member.constructorDef());
+    for (ClassMemberNode member : classDefNode.members) {
+      if (member instanceof FieldDeclNode fieldDecl) {
+        addFieldRepl(classDef, fieldDecl);
+      } else if (member instanceof MethodNode methodNode) {
+        addMethodRepl(classDef, methodNode);
+      } else if (member instanceof ConstructorNode ctorNode) {
+        addConstructorRepl(classDef, ctorNode);
       }
     }
     boolean hasDefault = false;
@@ -133,27 +141,28 @@ public class ReplHandler {
     buildVtableFor(classDef);
   }
 
-  private void registerReplFunction(cppParser.FunctionDefContext ctx) {
-    Type returnType = typeResolver.parse(ctx.type());
+  private void registerReplFunction(FunctionNode functionNode) {
+    Type returnType = typeResolver.parse(functionNode.returnType);
     if (returnType.isRef) {
       throw new CompileError("Reference return types are not allowed: " + returnType);
     }
-    String name = ctx.ID().getText();
-    List<ParamDef> params = parseParams(ctx.paramList());
-    FunctionDef def = new FunctionDef(name, returnType, params, ctx.block());
+    String name = functionNode.name;
+    List<ParamDef> params = parseParams(functionNode.params);
+    BlockNode body = functionNode.body;
+    FunctionDef def = new FunctionDef(name, returnType, params, body);
     dispatch.ensureUniqueFunction(def);
     program.addFunction(def);
   }
 
-  private void addFieldRepl(ClassDef classDef, cppParser.FieldDeclContext ctx) {
-    Type type = typeResolver.parse(ctx.type());
+  private void addFieldRepl(ClassDef classDef, FieldDeclNode fieldDecl) {
+    Type type = typeResolver.parse(fieldDecl.type);
     if (type.isRef) {
       throw new CompileError("Reference fields are not allowed: " + type);
     }
     if (type.isVoid()) {
       throw new CompileError("Field type cannot be void");
     }
-    String name = ctx.ID().getText();
+    String name = fieldDecl.name;
     Set<String> existing = objectModel.collectFieldNames(classDef);
     if (existing.contains(name)) {
       throw new CompileError("Field already defined: " + name);
@@ -161,15 +170,16 @@ public class ReplHandler {
     classDef.fields.add(new FieldDef(type, name));
   }
 
-  private void addMethodRepl(ClassDef classDef, cppParser.MethodDefContext ctx) {
-    boolean isVirtual = ctx.getChild(0).getText().equals("virtual");
-    Type returnType = typeResolver.parse(ctx.type());
+  private void addMethodRepl(ClassDef classDef, MethodNode methodNode) {
+    boolean isVirtual = methodNode.isVirtual;
+    Type returnType = typeResolver.parse(methodNode.returnType);
     if (returnType.isRef) {
       throw new CompileError("Reference return types are not allowed: " + returnType);
     }
-    String name = ctx.ID().getText();
-    List<ParamDef> params = parseParams(ctx.paramList());
-    MethodDef def = new MethodDef(name, returnType, params, ctx.block(), isVirtual, classDef.name);
+    String name = methodNode.name;
+    List<ParamDef> params = parseParams(methodNode.params);
+    MethodDef def =
+        new MethodDef(name, returnType, params, methodNode.body, isVirtual, classDef.name);
     String signature = SignatureUtil.signature(name, params);
     for (MethodDef existing : classDef.methods) {
       if (SignatureUtil.signature(existing.name, existing.params).equals(signature)) {
@@ -179,33 +189,33 @@ public class ReplHandler {
     classDef.methods.add(def);
   }
 
-  private void addConstructorRepl(ClassDef classDef, cppParser.ConstructorDefContext ctx) {
-    String name = ctx.ID().getText();
+  private void addConstructorRepl(ClassDef classDef, ConstructorNode ctorNode) {
+    String name = ctorNode.name;
     if (!name.equals(classDef.name)) {
       throw new CompileError("Constructor name must match class: " + name);
     }
-    List<ParamDef> params = parseParams(ctx.paramList());
+    List<ParamDef> params = parseParams(ctorNode.params);
     String signature = SignatureUtil.signature(name, params);
     for (ConstructorDef existing : classDef.constructors) {
       if (SignatureUtil.signature(existing.className, existing.params).equals(signature)) {
         throw new CompileError("Constructor already defined: " + signature);
       }
     }
-    classDef.constructors.add(new ConstructorDef(classDef.name, params, ctx.block()));
+    classDef.constructors.add(new ConstructorDef(classDef.name, params, ctorNode.body));
   }
 
-  private List<ParamDef> parseParams(cppParser.ParamListContext ctx) {
+  private List<ParamDef> parseParams(List<ParamNode> paramNodes) {
     List<ParamDef> params = new ArrayList<>();
-    if (ctx == null) {
+    if (paramNodes == null) {
       return params;
     }
     Set<String> names = new HashSet<>();
-    for (cppParser.ParamContext paramCtx : ctx.param()) {
-      Type type = typeResolver.parse(paramCtx.type());
+    for (ParamNode paramNode : paramNodes) {
+      Type type = typeResolver.parse(paramNode.type);
       if (type.isVoid()) {
         throw new CompileError("Parameter type cannot be void");
       }
-      String name = paramCtx.ID().getText();
+      String name = paramNode.name;
       if (!names.add(name)) {
         throw new CompileError("Duplicate parameter: " + name);
       }

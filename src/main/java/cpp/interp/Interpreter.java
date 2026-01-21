@@ -1,6 +1,5 @@
 package cpp.interp;
 
-import cpp.antlr.cppParser;
 import cpp.model.FunctionDef;
 import cpp.model.ProgramDef;
 import cpp.runtime.Env;
@@ -45,7 +44,7 @@ public class Interpreter {
     Env sessionEnv = new Env(null);
     ExecContext context = new ExecContext(sessionEnv, null, null);
     try {
-      stmtExecutor.executeBlock((cppParser.BlockContext) main.body, context, false);
+      stmtExecutor.executeBlock(main.body, context, false);
     } catch (ReturnSignal signal) {
       if (!main.returnType.isVoid()) {
         objectModel.expectType(main.returnType, signal.value.type, "return");

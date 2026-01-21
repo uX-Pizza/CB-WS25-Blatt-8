@@ -1,6 +1,14 @@
 package cpp.interp;
 
-import cpp.antlr.cppParser;
+import cpp.ast.AssignExprNode;
+import cpp.ast.BinaryExprNode;
+import cpp.ast.CallExprNode;
+import cpp.ast.ExprNode;
+import cpp.ast.FieldAccessNode;
+import cpp.ast.LiteralNode;
+import cpp.ast.MethodCallNode;
+import cpp.ast.UnaryExprNode;
+import cpp.ast.VarRefNode;
 import cpp.error.CompileError;
 import cpp.error.RuntimeError;
 import cpp.model.ClassDef;
@@ -43,27 +51,49 @@ public class ExprEvaluator {
     this.stmtExecutor = stmtExecutor;
   }
 
-  public EvalResult evalExpr(cppParser.ExprContext ctx, ExecContext context) {
-    return evalAssignment(ctx.assignment(), context);
+  public EvalResult evalExpr(ExprNode expr, ExecContext context) {
+    if (expr instanceof AssignExprNode assignExpr) {
+      return evalAssignment(assignExpr, context);
+    }
+    if (expr instanceof BinaryExprNode binaryExpr) {
+      return evalBinary(binaryExpr, context);
+    }
+    if (expr instanceof UnaryExprNode unaryExpr) {
+      return evalUnary(unaryExpr, context);
+    }
+    if (expr instanceof LiteralNode literal) {
+      return evalLiteral(literal);
+    }
+    if (expr instanceof VarRefNode varRef) {
+      return evalVarRef(varRef, context);
+    }
+    if (expr instanceof CallExprNode call) {
+      return evalCall(call, context);
+    }
+    if (expr instanceof MethodCallNode methodCall) {
+      return evalMethodCall(methodCall, context);
+    }
+    if (expr instanceof FieldAccessNode fieldAccess) {
+      return evalFieldAccess(fieldAccess, context);
+    }
+    throw new CompileError("Unknown expression");
   }
 
-  private EvalResult evalAssignment(cppParser.AssignmentContext ctx, ExecContext context) {
-    EvalResult left = evalLogicalOr(ctx.logicalOr(), context);
-    if (ctx.assignment() == null) {
-      return left;
-    }
+  private EvalResult evalAssignment(AssignExprNode expr, ExecContext context) {
+    EvalResult left = evalExpr(expr.target, context);
     if (!left.isLValue) {
       throw new CompileError("Assignment target is not an lvalue");
     }
-    EvalResult right = evalAssignment(ctx.assignment(), context);
+    EvalResult right = evalExpr(expr.value, context);
     Type targetType = left.slot.getDeclaredType().withoutRef();
     objectModel.assignValueToSlot(left.slot, targetType, right);
     return new EvalResult(right.value, right.type, false, null, false);
   }
 
-  private EvalResult evalLogicalOr(cppParser.LogicalOrContext ctx, ExecContext context) {
-    EvalResult left = evalLogicalAnd(ctx.logicalAnd(0), context);
-    for (int i = 1; i < ctx.logicalAnd().size(); i++) {
+  private EvalResult evalBinary(BinaryExprNode expr, ExecContext context) {
+    String op = expr.op;
+    if ("||".equals(op)) {
+      EvalResult left = evalExpr(expr.left, context);
       if (left.type.kind != Type.Kind.BOOL) {
         throw new CompileError("|| requires bool operands");
       }
@@ -71,24 +101,19 @@ public class ExprEvaluator {
       if (leftVal) {
         return new EvalResult(Value.boolValue(true), Type.boolType(false), false, null, false);
       }
-      EvalResult right = evalLogicalAnd(ctx.logicalAnd(i), context);
+      EvalResult right = evalExpr(expr.right, context);
       if (right.type.kind != Type.Kind.BOOL) {
         throw new CompileError("|| requires bool operands");
       }
-      left =
-          new EvalResult(
-              Value.boolValue((boolean) right.value.data),
-              Type.boolType(false),
-              false,
-              null,
-              false);
+      return new EvalResult(
+          Value.boolValue((boolean) right.value.data),
+          Type.boolType(false),
+          false,
+          null,
+          false);
     }
-    return left;
-  }
-
-  private EvalResult evalLogicalAnd(cppParser.LogicalAndContext ctx, ExecContext context) {
-    EvalResult left = evalEquality(ctx.equality(0), context);
-    for (int i = 1; i < ctx.equality().size(); i++) {
+    if ("&&".equals(op)) {
+      EvalResult left = evalExpr(expr.left, context);
       if (left.type.kind != Type.Kind.BOOL) {
         throw new CompileError("&& requires bool operands");
       }
@@ -96,26 +121,22 @@ public class ExprEvaluator {
       if (!leftVal) {
         return new EvalResult(Value.boolValue(false), Type.boolType(false), false, null, false);
       }
-      EvalResult right = evalEquality(ctx.equality(i), context);
+      EvalResult right = evalExpr(expr.right, context);
       if (right.type.kind != Type.Kind.BOOL) {
         throw new CompileError("&& requires bool operands");
       }
-      left =
-          new EvalResult(
-              Value.boolValue((boolean) right.value.data),
-              Type.boolType(false),
-              false,
-              null,
-              false);
+      return new EvalResult(
+          Value.boolValue((boolean) right.value.data),
+          Type.boolType(false),
+          false,
+          null,
+          false);
     }
-    return left;
-  }
 
-  private EvalResult evalEquality(cppParser.EqualityContext ctx, ExecContext context) {
-    EvalResult left = evalRelational(ctx.relational(0), context);
-    for (int i = 1; i < ctx.relational().size(); i++) {
-      String op = ctx.getChild(2 * i - 1).getText();
-      EvalResult right = evalRelational(ctx.relational(i), context);
+    EvalResult left = evalExpr(expr.left, context);
+    EvalResult right = evalExpr(expr.right, context);
+
+    if ("==".equals(op) || "!=".equals(op)) {
       objectModel.expectType(left.type, right.type, "comparison");
       boolean result;
       if (left.type.kind == Type.Kind.INT) {
@@ -137,16 +158,10 @@ public class ExprEvaluator {
       } else {
         throw new CompileError("Unsupported == for type: " + left.type);
       }
-      left = new EvalResult(Value.boolValue(result), Type.boolType(false), false, null, false);
+      return new EvalResult(Value.boolValue(result), Type.boolType(false), false, null, false);
     }
-    return left;
-  }
 
-  private EvalResult evalRelational(cppParser.RelationalContext ctx, ExecContext context) {
-    EvalResult left = evalAdditive(ctx.additive(0), context);
-    for (int i = 1; i < ctx.additive().size(); i++) {
-      String op = ctx.getChild(2 * i - 1).getText();
-      EvalResult right = evalAdditive(ctx.additive(i), context);
+    if ("<".equals(op) || "<=".equals(op) || ">".equals(op) || ">=".equals(op)) {
       objectModel.expectType(left.type, right.type, "comparison");
       boolean result;
       if (left.type.kind == Type.Kind.INT) {
@@ -174,211 +189,111 @@ public class ExprEvaluator {
       } else {
         throw new CompileError("Relational operators require int or char");
       }
-      left = new EvalResult(Value.boolValue(result), Type.boolType(false), false, null, false);
+      return new EvalResult(Value.boolValue(result), Type.boolType(false), false, null, false);
     }
-    return left;
-  }
 
-  private EvalResult evalAdditive(cppParser.AdditiveContext ctx, ExecContext context) {
-    EvalResult left = evalMultiplicative(ctx.multiplicative(0), context);
-    for (int i = 1; i < ctx.multiplicative().size(); i++) {
-      String op = ctx.getChild(2 * i - 1).getText();
-      EvalResult right = evalMultiplicative(ctx.multiplicative(i), context);
-      objectModel.expectType(left.type, right.type, "arithmetic");
-      if (left.type.kind != Type.Kind.INT) {
-        throw new CompileError("Arithmetic requires int operands");
-      }
-      int l = (int) left.value.data;
-      int r = (int) right.value.data;
-      int result = op.equals("+") ? l + r : l - r;
-      left = new EvalResult(Value.intValue(result), Type.intType(false), false, null, false);
+    objectModel.expectType(left.type, right.type, "arithmetic");
+    if (left.type.kind != Type.Kind.INT) {
+      throw new CompileError("Arithmetic requires int operands");
     }
-    return left;
-  }
-
-  private EvalResult evalMultiplicative(cppParser.MultiplicativeContext ctx, ExecContext context) {
-    EvalResult left = evalUnary(ctx.unary(0), context);
-    for (int i = 1; i < ctx.unary().size(); i++) {
-      String op = ctx.getChild(2 * i - 1).getText();
-      EvalResult right = evalUnary(ctx.unary(i), context);
-      objectModel.expectType(left.type, right.type, "arithmetic");
-      if (left.type.kind != Type.Kind.INT) {
-        throw new CompileError("Arithmetic requires int operands");
-      }
-      int l = (int) left.value.data;
-      int r = (int) right.value.data;
-      int result;
-      switch (op) {
-        case "*" -> result = l * r;
-        case "/" -> {
-          if (r == 0) {
-            throw new RuntimeError("Division by zero");
-          }
-          result = l / r;
+    int l = (int) left.value.data;
+    int r = (int) right.value.data;
+    int result;
+    switch (op) {
+      case "+" -> result = l + r;
+      case "-" -> result = l - r;
+      case "*" -> result = l * r;
+      case "/" -> {
+        if (r == 0) {
+          throw new RuntimeError("Division by zero");
         }
-        case "%" -> {
-          if (r == 0) {
-            throw new RuntimeError("Division by zero");
-          }
-          result = l % r;
-        }
-        default -> throw new CompileError("Unknown operator: " + op);
+        result = l / r;
       }
-      left = new EvalResult(Value.intValue(result), Type.intType(false), false, null, false);
+      case "%" -> {
+        if (r == 0) {
+          throw new RuntimeError("Division by zero");
+        }
+        result = l % r;
+      }
+      default -> throw new CompileError("Unknown operator: " + op);
     }
-    return left;
+    return new EvalResult(Value.intValue(result), Type.intType(false), false, null, false);
   }
 
-  private EvalResult evalUnary(cppParser.UnaryContext ctx, ExecContext context) {
-    if (ctx.unary() != null) {
-      String op = ctx.getChild(0).getText();
-      EvalResult value = evalUnary(ctx.unary(), context);
-      if (op.equals("!")) {
-        if (value.type.kind != Type.Kind.BOOL) {
-          throw new CompileError("! requires bool operand");
-        }
-        return new EvalResult(
-            Value.boolValue(!(boolean) value.value.data), Type.boolType(false), false, null, false);
+  private EvalResult evalUnary(UnaryExprNode expr, ExecContext context) {
+    String op = expr.op;
+    EvalResult value = evalExpr(expr.expr, context);
+    if ("!".equals(op)) {
+      if (value.type.kind != Type.Kind.BOOL) {
+        throw new CompileError("! requires bool operand");
       }
-      if (value.type.kind != Type.Kind.INT) {
-        throw new CompileError("Unary +/- requires int operand");
-      }
-      int v = (int) value.value.data;
-      int result = op.equals("-") ? -v : v;
-      return new EvalResult(Value.intValue(result), Type.intType(false), false, null, false);
+      return new EvalResult(
+          Value.boolValue(!(boolean) value.value.data), Type.boolType(false), false, null, false);
     }
-    return evalPostfix(ctx.postfix(), context);
+    if (value.type.kind != Type.Kind.INT) {
+      throw new CompileError("Unary +/- requires int operand");
+    }
+    int v = (int) value.value.data;
+    int result = op.equals("-") ? -v : v;
+    return new EvalResult(Value.intValue(result), Type.intType(false), false, null, false);
   }
 
-  private EvalResult evalPostfix(cppParser.PostfixContext ctx, ExecContext context) {
-    EvalResult current = evalPrimary(ctx.primary(), context);
-    int i = 1;
-    while (i < ctx.getChildCount()) {
-      String dot = ctx.getChild(i).getText();
-      if (!".".equals(dot)) {
-        throw new CompileError("Invalid postfix expression");
-      }
-      String member = ctx.getChild(i + 1).getText();
-      i += 2;
-      if (i < ctx.getChildCount() && "(".equals(ctx.getChild(i).getText())) {
-        cppParser.ArgListContext argCtx = null;
-        if (i + 1 < ctx.getChildCount()
-            && ctx.getChild(i + 1) instanceof cppParser.ArgListContext) {
-          argCtx = (cppParser.ArgListContext) ctx.getChild(i + 1);
-          i++;
-        }
-        i++;
-        if (i < ctx.getChildCount() && ")".equals(ctx.getChild(i).getText())) {
-          i++;
-        }
-        List<ArgInfo> args = evalArgs(argCtx, context);
-        current = invokeMethod(current, member, args, context);
-      } else {
-        current = accessField(current, member);
-      }
+  private EvalResult evalVarRef(VarRefNode expr, ExecContext context) {
+    VarSlot slot = resolveVarSlot(expr.name, context);
+    if (slot != null) {
+      Value value = slot.get();
+      Type type = slot.getDeclaredType().withoutRef();
+      boolean isRefBinding = slot.isRef();
+      return new EvalResult(value, type, true, slot, isRefBinding);
     }
-    return current;
+    throw new CompileError("Unknown identifier: " + expr.name);
   }
 
-  private EvalResult evalPrimary(cppParser.PrimaryContext ctx, ExecContext context) {
-    if (ctx.literal() != null) {
-      return evalLiteral(ctx.literal());
+  private EvalResult evalCall(CallExprNode call, ExecContext context) {
+    List<ArgInfo> args = evalArgs(call.args, context);
+    if (program.classes.containsKey(call.name)) {
+      Instance instance = objectModel.createInstance(program.classes.get(call.name), args);
+      Type type = Type.classType(call.name, false);
+      return new EvalResult(new Value(type, instance), type, false, null, false);
     }
-    if (ctx.ID() != null && ctx.getChildCount() == 1) {
-      String name = ctx.ID().getText();
-      VarSlot slot = resolveVarSlot(name, context);
-      if (slot != null) {
-        Value value = slot.get();
-        Type type = slot.getDeclaredType().withoutRef();
-        boolean isRefBinding = slot.isRef();
-        return new EvalResult(value, type, true, slot, isRefBinding);
-      }
-      throw new CompileError("Unknown identifier: " + name);
-    }
-    if (ctx.ID() != null && ctx.getChildCount() > 1) {
-      String name = ctx.ID().getText();
-      List<ArgInfo> args = evalArgs(ctx.argList(), context);
-      if (program.classes.containsKey(name)) {
-        Instance instance = objectModel.createInstance(program.classes.get(name), args);
-        Type type = Type.classType(name, false);
-        return new EvalResult(new Value(type, instance), type, false, null, false);
-      }
-      return invokeFunction(name, args, context);
-    }
-    if (ctx.expr() != null) {
-      return evalExpr(ctx.expr(), context);
-    }
-    throw new CompileError("Unknown primary expression");
+    return invokeFunction(call.name, args, context);
   }
 
-  private EvalResult evalLiteral(cppParser.LiteralContext ctx) {
-    if (ctx.INT() != null) {
-      int value = Integer.parseInt(ctx.INT().getText());
-      return new EvalResult(Value.intValue(value), Type.intType(false), false, null, false);
+  private EvalResult evalMethodCall(MethodCallNode call, ExecContext context) {
+    EvalResult receiver = evalExpr(call.receiver, context);
+    List<ArgInfo> args = evalArgs(call.args, context);
+    return invokeMethod(receiver, call.name, args, context);
+  }
+
+  private EvalResult evalFieldAccess(FieldAccessNode access, ExecContext context) {
+    EvalResult receiver = evalExpr(access.receiver, context);
+    return accessField(receiver, access.name);
+  }
+
+  private EvalResult evalLiteral(LiteralNode literal) {
+    Object value = literal.value;
+    if (value instanceof Integer intValue) {
+      return new EvalResult(Value.intValue(intValue), Type.intType(false), false, null, false);
     }
-    if (ctx.BOOL() != null) {
-      boolean value = ctx.BOOL().getText().equals("true");
-      return new EvalResult(Value.boolValue(value), Type.boolType(false), false, null, false);
+    if (value instanceof Boolean boolValue) {
+      return new EvalResult(Value.boolValue(boolValue), Type.boolType(false), false, null, false);
     }
-    if (ctx.CHAR() != null) {
-      char value = parseCharLiteral(ctx.CHAR().getText());
-      return new EvalResult(Value.charValue(value), Type.charType(false), false, null, false);
+    if (value instanceof Character charValue) {
+      return new EvalResult(Value.charValue(charValue), Type.charType(false), false, null, false);
     }
-    if (ctx.STRING() != null) {
-      String value = parseStringLiteral(ctx.STRING().getText());
-      return new EvalResult(Value.stringValue(value), Type.stringType(false), false, null, false);
+    if (value instanceof String stringValue) {
+      return new EvalResult(
+          Value.stringValue(stringValue), Type.stringType(false), false, null, false);
     }
     throw new CompileError("Unknown literal");
   }
 
-  private char parseCharLiteral(String text) {
-    String body = text.substring(1, text.length() - 1);
-    if (body.startsWith("\\")) {
-      return parseEscape(body.charAt(1));
-    }
-    if (body.length() != 1) {
-      throw new CompileError("Invalid char literal");
-    }
-    return body.charAt(0);
-  }
-
-  private String parseStringLiteral(String text) {
-    String body = text.substring(1, text.length() - 1);
-    StringBuilder out = new StringBuilder();
-    for (int i = 0; i < body.length(); i++) {
-      char c = body.charAt(i);
-      if (c == '\\') {
-        if (i + 1 >= body.length()) {
-          throw new CompileError("Invalid string escape");
-        }
-        out.append(parseEscape(body.charAt(i + 1)));
-        i++;
-      } else {
-        out.append(c);
-      }
-    }
-    return out.toString();
-  }
-
-  private char parseEscape(char c) {
-    return switch (c) {
-      case 'n' -> '\n';
-      case 't' -> '\t';
-      case 'r' -> '\r';
-      case '0' -> '\0';
-      case '\\' -> '\\';
-      case '\'' -> '\'';
-      case '"' -> '"';
-      default -> c;
-    };
-  }
-
-  private List<ArgInfo> evalArgs(cppParser.ArgListContext ctx, ExecContext context) {
+  private List<ArgInfo> evalArgs(List<ExprNode> exprs, ExecContext context) {
     List<ArgInfo> args = new ArrayList<>();
-    if (ctx == null) {
+    if (exprs == null) {
       return args;
     }
-    for (cppParser.ExprContext expr : ctx.expr()) {
+    for (ExprNode expr : exprs) {
       EvalResult result = evalExpr(expr, context);
       args.add(new ArgInfo(result));
     }
@@ -398,7 +313,7 @@ public class ExprEvaluator {
     ExecContext fnContext = new ExecContext(new cpp.runtime.Env(null), null, null);
     stmtExecutor.bindParams(fnContext.env, selected.params, args, null);
     try {
-      stmtExecutor.executeBlock((cppParser.BlockContext) selected.body, fnContext, false);
+      stmtExecutor.executeBlock(selected.body, fnContext, false);
     } catch (ReturnSignal signal) {
       if (selected.returnType.isVoid()) {
         if (signal.value != null && !signal.value.type.isVoid()) {
@@ -437,7 +352,7 @@ public class ExprEvaluator {
             new cpp.runtime.Env(null), instance, program.classes.get(target.declaredIn));
     stmtExecutor.bindParams(methodContext.env, target.params, args, methodContext.currentClass);
     try {
-      stmtExecutor.executeBlock((cppParser.BlockContext) target.body, methodContext, false);
+      stmtExecutor.executeBlock(target.body, methodContext, false);
     } catch (ReturnSignal signal) {
       if (target.returnType.isVoid()) {
         if (signal.value != null && !signal.value.type.isVoid()) {

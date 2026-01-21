@@ -1,6 +1,14 @@
 package cpp.sema;
 
-import cpp.antlr.cppParser;
+import cpp.ast.ClassDefNode;
+import cpp.ast.ClassMemberNode;
+import cpp.ast.ConstructorNode;
+import cpp.ast.FieldDeclNode;
+import cpp.ast.FunctionNode;
+import cpp.ast.MethodNode;
+import cpp.ast.ParamNode;
+import cpp.ast.ProgramNode;
+import cpp.ast.TypeNode;
 import cpp.error.CompileError;
 import cpp.model.ClassDef;
 import cpp.model.ConstructorDef;
@@ -20,22 +28,22 @@ import java.util.Set;
 public class DefinitionBuilder {
   private final ProgramDef program = new ProgramDef();
 
-  public ProgramDef build(cppParser.ProgramContext ctx) {
-    for (cppParser.TopLevelDeclContext decl : ctx.topLevelDecl()) {
-      if (decl.classDef() != null) {
-        registerClassHeader(decl.classDef());
+  public ProgramDef build(ProgramNode programNode) {
+    for (var decl : programNode.declarations) {
+      if (decl instanceof ClassDefNode classDef) {
+        registerClassHeader(classDef);
       }
     }
 
-    for (cppParser.TopLevelDeclContext decl : ctx.topLevelDecl()) {
-      if (decl.functionDef() != null) {
-        registerFunction(decl.functionDef());
+    for (var decl : programNode.declarations) {
+      if (decl instanceof FunctionNode functionDef) {
+        registerFunction(functionDef);
       }
     }
 
-    for (cppParser.TopLevelDeclContext decl : ctx.topLevelDecl()) {
-      if (decl.classDef() != null) {
-        populateClassMembers(decl.classDef());
+    for (var decl : programNode.declarations) {
+      if (decl instanceof ClassDefNode classDef) {
+        populateClassMembers(classDef);
       }
     }
 
@@ -47,53 +55,49 @@ public class DefinitionBuilder {
     return program;
   }
 
-  private void registerClassHeader(cppParser.ClassDefContext ctx) {
-    String name = ctx.ID(0).getText();
-    String baseName = null;
-    if (ctx.ID().size() > 1) {
-      baseName = ctx.ID(1).getText();
-    }
+  private void registerClassHeader(ClassDefNode classDef) {
+    String name = classDef.name;
+    String baseName = classDef.baseName;
     if (program.classes.containsKey(name)) {
       throw new CompileError("Class already defined: " + name);
     }
     program.classes.put(name, new ClassDef(name, baseName));
   }
 
-  private void registerFunction(cppParser.FunctionDefContext ctx) {
-    Type returnType = parseType(ctx.type());
+  private void registerFunction(FunctionNode functionDef) {
+    Type returnType = parseType(functionDef.returnType);
     if (returnType.isRef) {
       throw new CompileError("Reference return types are not allowed: " + returnType);
     }
-    String name = ctx.ID().getText();
-    List<ParamDef> params = parseParams(ctx.paramList());
-    FunctionDef def = new FunctionDef(name, returnType, params, ctx.block());
+    String name = functionDef.name;
+    List<ParamDef> params = parseParams(functionDef.params);
+    FunctionDef def = new FunctionDef(name, returnType, params, functionDef.body);
     ensureUniqueFunction(def);
     program.addFunction(def);
   }
 
-  private void populateClassMembers(cppParser.ClassDefContext ctx) {
-    String name = ctx.ID(0).getText();
-    ClassDef classDef = program.classes.get(name);
-    for (cppParser.ClassMemberContext member : ctx.classMember()) {
-      if (member.fieldDecl() != null) {
-        addField(classDef, member.fieldDecl());
-      } else if (member.methodDef() != null) {
-        addMethod(classDef, member.methodDef());
-      } else if (member.constructorDef() != null) {
-        addConstructor(classDef, member.constructorDef());
+  private void populateClassMembers(ClassDefNode classDefNode) {
+    ClassDef classDef = program.classes.get(classDefNode.name);
+    for (ClassMemberNode member : classDefNode.members) {
+      if (member instanceof FieldDeclNode fieldDecl) {
+        addField(classDef, fieldDecl);
+      } else if (member instanceof MethodNode methodDef) {
+        addMethod(classDef, methodDef);
+      } else if (member instanceof ConstructorNode ctorDef) {
+        addConstructor(classDef, ctorDef);
       }
     }
   }
 
-  private void addField(ClassDef classDef, cppParser.FieldDeclContext ctx) {
-    Type type = parseType(ctx.type());
+  private void addField(ClassDef classDef, FieldDeclNode fieldDecl) {
+    Type type = parseType(fieldDecl.type);
     if (type.isRef) {
       throw new CompileError("Reference fields are not allowed: " + type);
     }
     if (type.isVoid()) {
       throw new CompileError("Field type cannot be void");
     }
-    String name = ctx.ID().getText();
+    String name = fieldDecl.name;
     for (FieldDef field : classDef.fields) {
       if (field.name.equals(name)) {
         throw new CompileError("Field already defined: " + name);
@@ -102,15 +106,16 @@ public class DefinitionBuilder {
     classDef.fields.add(new FieldDef(type, name));
   }
 
-  private void addMethod(ClassDef classDef, cppParser.MethodDefContext ctx) {
-    boolean isVirtual = ctx.getChild(0).getText().equals("virtual");
-    Type returnType = parseType(ctx.type());
+  private void addMethod(ClassDef classDef, MethodNode methodDef) {
+    boolean isVirtual = methodDef.isVirtual;
+    Type returnType = parseType(methodDef.returnType);
     if (returnType.isRef) {
       throw new CompileError("Reference return types are not allowed: " + returnType);
     }
-    String name = ctx.ID().getText();
-    List<ParamDef> params = parseParams(ctx.paramList());
-    MethodDef def = new MethodDef(name, returnType, params, ctx.block(), isVirtual, classDef.name);
+    String name = methodDef.name;
+    List<ParamDef> params = parseParams(methodDef.params);
+    MethodDef def =
+        new MethodDef(name, returnType, params, methodDef.body, isVirtual, classDef.name);
     String signature = SignatureUtil.signature(name, params);
     for (MethodDef existing : classDef.methods) {
       if (SignatureUtil.signature(existing.name, existing.params).equals(signature)) {
@@ -120,33 +125,33 @@ public class DefinitionBuilder {
     classDef.methods.add(def);
   }
 
-  private void addConstructor(ClassDef classDef, cppParser.ConstructorDefContext ctx) {
-    String name = ctx.ID().getText();
+  private void addConstructor(ClassDef classDef, ConstructorNode ctorDef) {
+    String name = ctorDef.name;
     if (!name.equals(classDef.name)) {
       throw new CompileError("Constructor name must match class: " + name);
     }
-    List<ParamDef> params = parseParams(ctx.paramList());
+    List<ParamDef> params = parseParams(ctorDef.params);
     String signature = SignatureUtil.signature(name, params);
     for (ConstructorDef existing : classDef.constructors) {
       if (SignatureUtil.signature(existing.className, existing.params).equals(signature)) {
         throw new CompileError("Constructor already defined: " + signature);
       }
     }
-    classDef.constructors.add(new ConstructorDef(classDef.name, params, ctx.block()));
+    classDef.constructors.add(new ConstructorDef(classDef.name, params, ctorDef.body));
   }
 
-  private List<ParamDef> parseParams(cppParser.ParamListContext ctx) {
+  private List<ParamDef> parseParams(List<ParamNode> paramNodes) {
     List<ParamDef> params = new ArrayList<>();
-    if (ctx == null) {
+    if (paramNodes == null) {
       return params;
     }
     Set<String> names = new HashSet<>();
-    for (cppParser.ParamContext paramCtx : ctx.param()) {
-      Type type = parseType(paramCtx.type());
+    for (ParamNode paramNode : paramNodes) {
+      Type type = parseType(paramNode.type);
       if (type.isVoid()) {
         throw new CompileError("Parameter type cannot be void");
       }
-      String name = paramCtx.ID().getText();
+      String name = paramNode.name;
       if (names.contains(name)) {
         throw new CompileError("Duplicate parameter: " + name);
       }
@@ -156,9 +161,9 @@ public class DefinitionBuilder {
     return params;
   }
 
-  private Type parseType(cppParser.TypeContext ctx) {
-    String base = ctx.baseType().getText();
-    boolean isRef = ctx.ref() != null;
+  private Type parseType(TypeNode typeNode) {
+    String base = typeNode.name;
+    boolean isRef = typeNode.isRef;
     if ("int".equals(base)) {
       return Type.intType(isRef);
     }
