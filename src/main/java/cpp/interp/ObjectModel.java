@@ -38,7 +38,7 @@ public class ObjectModel {
       ExecContext ctorContext = new ExecContext(new cpp.runtime.Env(null), instance, classDef);
       stmtExecutor.bindParams(ctorContext.env, ctor.params, args, classDef);
       try {
-        stmtExecutor.executeBlock((cpp.antlr.cppParser.BlockContext) ctor.body, ctorContext, false);
+        stmtExecutor.executeBlock(ctor.body, ctorContext, false);
       } catch (cpp.runtime.ReturnSignal signal) {
         throw new CompileError("Return not allowed in constructor");
       }
@@ -169,8 +169,7 @@ public class ObjectModel {
     }
     ExecContext ctorContext = new ExecContext(new cpp.runtime.Env(null), instance, baseClass);
     try {
-      stmtExecutor.executeBlock(
-          (cpp.antlr.cppParser.BlockContext) baseCtor.body, ctorContext, false);
+      stmtExecutor.executeBlock(baseCtor.body, ctorContext, false);
     } catch (cpp.runtime.ReturnSignal signal) {
       throw new CompileError("Return not allowed in constructor");
     }

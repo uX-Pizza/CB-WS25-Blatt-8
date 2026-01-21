@@ -1,7 +1,7 @@
 package cpp.sema;
 
-import cpp.antlr.cppParser;
 import cpp.error.CompileError;
+import cpp.ast.TypeNode;
 import cpp.model.ProgramDef;
 import cpp.model.Type;
 
@@ -12,9 +12,9 @@ public class TypeResolver {
     this.program = program;
   }
 
-  public Type parse(cppParser.TypeContext ctx) {
-    String base = ctx.baseType().getText();
-    boolean isRef = ctx.ref() != null;
+  public Type parse(TypeNode node) {
+    String base = node.name;
+    boolean isRef = node.isRef;
     if ("int".equals(base)) {
       return Type.intType(isRef);
     }

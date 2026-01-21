@@ -6,8 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import cpp.antlr.cppLexer;
 import cpp.antlr.cppParser;
+import cpp.ast.ProgramNode;
 import cpp.interp.Interpreter;
 import cpp.model.ProgramDef;
+import cpp.sema.ASTBuilder;
 import cpp.sema.DefinitionBuilder;
 import cpp.util.ParserErrorListener;
 import java.io.ByteArrayOutputStream;
@@ -79,7 +81,8 @@ class CppTestSuite {
       parser.addErrorListener(new ParserErrorListener());
       cppParser.ProgramContext programCtx = parser.program();
 
-      ProgramDef program = new DefinitionBuilder().build(programCtx);
+      ProgramNode programNode = (ProgramNode) new ASTBuilder().visit(programCtx);
+      ProgramDef program = new DefinitionBuilder().build(programNode);
       Interpreter interpreter = new Interpreter(program);
       interpreter.runMain();
       return buffer.toString(StandardCharsets.UTF_8);

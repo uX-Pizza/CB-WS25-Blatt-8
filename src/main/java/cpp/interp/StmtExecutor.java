@@ -1,6 +1,12 @@
 package cpp.interp;
 
-import cpp.antlr.cppParser;
+import cpp.ast.BlockNode;
+import cpp.ast.ExprStmtNode;
+import cpp.ast.IfStmtNode;
+import cpp.ast.ReturnStmtNode;
+import cpp.ast.StmtNode;
+import cpp.ast.VarDeclNode;
+import cpp.ast.WhileStmtNode;
 import cpp.error.CompileError;
 import cpp.model.ClassDef;
 import cpp.model.Type;
@@ -26,48 +32,48 @@ public class StmtExecutor {
     this.exprEvaluator = exprEvaluator;
   }
 
-  public void executeBlock(cppParser.BlockContext ctx, ExecContext context, boolean createScope) {
+  public void executeBlock(BlockNode block, ExecContext context, boolean createScope) {
     Env env = context.env;
     if (createScope) {
       env = new Env(env);
     }
     ExecContext local = new ExecContext(env, context.instance, context.currentClass);
-    for (cppParser.StmtContext stmt : ctx.stmt()) {
+    for (StmtNode stmt : block.statements) {
       executeStmt(stmt, local);
     }
   }
 
-  public void executeStmt(cppParser.StmtContext ctx, ExecContext context) {
-    if (ctx.varDecl() != null) {
-      executeVarDecl(ctx.varDecl(), context);
+  public void executeStmt(StmtNode stmt, ExecContext context) {
+    if (stmt instanceof VarDeclNode varDecl) {
+      executeVarDecl(varDecl, context);
       return;
     }
-    if (ctx.exprStmt() != null) {
-      exprEvaluator.evalExpr(ctx.exprStmt().expr(), context);
+    if (stmt instanceof ExprStmtNode exprStmt) {
+      exprEvaluator.evalExpr(exprStmt.expr, context);
       return;
     }
-    if (ctx.ifStmt() != null) {
-      executeIf(ctx.ifStmt(), context);
+    if (stmt instanceof IfStmtNode ifStmt) {
+      executeIf(ifStmt, context);
       return;
     }
-    if (ctx.whileStmt() != null) {
-      executeWhile(ctx.whileStmt(), context);
+    if (stmt instanceof WhileStmtNode whileStmt) {
+      executeWhile(whileStmt, context);
       return;
     }
-    if (ctx.returnStmt() != null) {
-      executeReturn(ctx.returnStmt(), context);
+    if (stmt instanceof ReturnStmtNode returnStmt) {
+      executeReturn(returnStmt, context);
       return;
     }
-    if (ctx.block() != null) {
-      executeBlock(ctx.block(), context, true);
+    if (stmt instanceof BlockNode block) {
+      executeBlock(block, context, true);
       return;
     }
     throw new CompileError("Unknown statement");
   }
 
-  public void executeVarDecl(cppParser.VarDeclContext ctx, ExecContext context) {
-    Type type = typeResolver.parse(ctx.type());
-    String name = ctx.ID().getText();
+  public void executeVarDecl(VarDeclNode decl, ExecContext context) {
+    Type type = typeResolver.parse(decl.type);
+    String name = decl.name;
     if (type.isVoid()) {
       throw new CompileError("Variable type cannot be void");
     }
@@ -80,14 +86,14 @@ public class StmtExecutor {
         throw new CompileError("Variable shadows field: " + name);
       }
     }
-    if (type.isRef && ctx.expr() == null) {
+    if (type.isRef && decl.init == null) {
       throw new CompileError("Reference variable requires initializer: " + name);
     }
-    if (ctx.expr() == null) {
+    if (decl.init == null) {
       context.env.define(name, objectModel.createValueSlot(type, objectModel.defaultValue(type)));
       return;
     }
-    EvalResult init = exprEvaluator.evalExpr(ctx.expr(), context);
+    EvalResult init = exprEvaluator.evalExpr(decl.init, context);
     if (type.isRef) {
       if (!init.isLValue) {
         throw new CompileError("Reference initializer must be lvalue: " + name);
@@ -107,31 +113,31 @@ public class StmtExecutor {
     context.env.define(name, objectModel.createValueSlot(type, init.value));
   }
 
-  private void executeIf(cppParser.IfStmtContext ctx, ExecContext context) {
-    boolean cond = evalCondition(ctx.expr(), context);
+  private void executeIf(IfStmtNode stmt, ExecContext context) {
+    boolean cond = evalCondition(stmt.condition, context);
     if (cond) {
-      executeBlock(ctx.block(0), context, true);
-    } else if (ctx.block().size() > 1) {
-      executeBlock(ctx.block(1), context, true);
+      executeBlock(stmt.thenBlock, context, true);
+    } else if (stmt.elseBlock != null) {
+      executeBlock(stmt.elseBlock, context, true);
     }
   }
 
-  private void executeWhile(cppParser.WhileStmtContext ctx, ExecContext context) {
-    while (evalCondition(ctx.expr(), context)) {
-      executeBlock(ctx.block(), context, true);
+  private void executeWhile(WhileStmtNode stmt, ExecContext context) {
+    while (evalCondition(stmt.condition, context)) {
+      executeBlock(stmt.body, context, true);
     }
   }
 
-  private void executeReturn(cppParser.ReturnStmtContext ctx, ExecContext context) {
-    if (ctx.expr() == null) {
+  private void executeReturn(ReturnStmtNode stmt, ExecContext context) {
+    if (stmt.value == null) {
       throw new ReturnSignal(cpp.runtime.Value.voidValue());
     }
-    EvalResult result = exprEvaluator.evalExpr(ctx.expr(), context);
+    EvalResult result = exprEvaluator.evalExpr(stmt.value, context);
     throw new ReturnSignal(result.value);
   }
 
-  private boolean evalCondition(cppParser.ExprContext ctx, ExecContext context) {
-    EvalResult result = exprEvaluator.evalExpr(ctx, context);
+  private boolean evalCondition(cpp.ast.ExprNode expr, ExecContext context) {
+    EvalResult result = exprEvaluator.evalExpr(expr, context);
     if (result.type.kind == Type.Kind.BOOL) {
       return (boolean) result.value.data;
     }

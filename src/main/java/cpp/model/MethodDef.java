@@ -1,13 +1,13 @@
 package cpp.model;
 
+import cpp.ast.BlockNode;
 import java.util.List;
-import org.antlr.v4.runtime.tree.ParseTree;
 
 public class MethodDef {
   public final String name;
   public final Type returnType;
   public final List<ParamDef> params;
-  public final ParseTree body;
+  public final BlockNode body;
   public final boolean isVirtual;
   public final String declaredIn;
 
@@ -15,7 +15,7 @@ public class MethodDef {
       String name,
       Type returnType,
       List<ParamDef> params,
-      ParseTree body,
+      BlockNode body,
       boolean isVirtual,
       String declaredIn) {
     this.name = name;
